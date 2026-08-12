@@ -124,9 +124,17 @@ def main():
         "100k": 100000,
         "1m": 1000000,
     }
+    # Query set size is per-dataset, not per-scale: the standard SIFT1M has a
+    # 10000-vector query set, GIST1M a 1000-vector query set (independent of the
+    # base scale, shared across 1k/10k/100k/1m).  Hardcoding 1000 falsely fails
+    # SIFT (query.fvecs / gt_top*.ivecs carry 10000 entries).
+    query_config = {
+        "sift": 10000,
+        "gist": 1000,
+    }
 
     sizes = [s.strip() for s in args.sizes.split(",")]
-    expected_query = 1000
+    expected_query = query_config.get(args.dataset, 1000)
     expected_ks = [10, 100]
     max_id = size_config[sizes[-1]]  # use largest size as max_id bound
 
