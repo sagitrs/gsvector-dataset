@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 #
-# Download GIST 1M dataset from corpus-texmex.irisa.fr
+# Download GIST 1M dataset from the official INRIA Texmex FTP mirror.
+# (The HTTP site corpus-texmex.irisa.fr returns 404 as of 2026-08; the FTP
+#  server ftp.irisa.fr/local/texmex/corpus/ is the live official source.)
 # Produces: raw/gist_base.fvecs, raw/gist_query.fvecs, raw/gist_learn.fvecs,
 #            raw/gist_groundtruth.ivecs
 #
@@ -9,7 +11,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RAW_DIR="$SCRIPT_DIR/../gist/raw"
-URL="http://corpus-texmex.irisa.fr/gist.tar.gz"
+URL="ftp://ftp.irisa.fr/local/texmex/corpus/gist.tar.gz"
 TARBALL="$RAW_DIR/gist.tar.gz"
 
 # Idempotency check
@@ -44,6 +46,13 @@ echo "[download_gist] Downloaded tarball: $SIZE bytes"
 
 echo "[download_gist] Extracting..."
 tar -xzf "$TARBALL" -C "$RAW_DIR"
+
+# The official texmex tarball extracts into a `gist/` subdirectory. Hoist the
+# raw fvecs/ivecs up to RAW_DIR so downstream (Makefile/slice_dataset.py)
+# finds them flat.
+find "$RAW_DIR" -maxdepth 2 -type f \( -name 'gist_base.fvecs' -o -name 'gist_query.fvecs' \
+    -o -name 'gist_learn.fvecs' -o -name 'gist_groundtruth.ivecs' \) \
+    -exec mv -f {} "$RAW_DIR/" \;
 
 EXPECTED=("gist_base.fvecs" "gist_query.fvecs" "gist_learn.fvecs" "gist_groundtruth.ivecs")
 for f in "${EXPECTED[@]}"; do

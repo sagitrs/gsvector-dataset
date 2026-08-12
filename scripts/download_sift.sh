@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 #
-# Download SIFT 1M dataset from corpus-texmex.irisa.fr
+# Download SIFT 1M dataset from the official INRIA Texmex FTP mirror.
+# (The HTTP site corpus-texmex.irisa.fr returns 404 as of 2026-08; the FTP
+#  server ftp.irisa.fr/local/texmex/corpus/ is the live official source.)
 # Produces: raw/sift_base.fvecs, raw/sift_query.fvecs, raw/sift_learn.fvecs,
 #            raw/sift_groundtruth.ivecs
 #
@@ -10,7 +12,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RAW_DIR="$SCRIPT_DIR/../sift/raw"
-URL="http://corpus-texmex.irisa.fr/sift.tar.gz"
+URL="ftp://ftp.irisa.fr/local/texmex/corpus/sift.tar.gz"
 TARBALL="$RAW_DIR/sift.tar.gz"
 
 # Idempotency check
@@ -47,6 +49,13 @@ echo "[download_sift] Downloaded tarball: $SIZE bytes"
 # Extract
 echo "[download_sift] Extracting..."
 tar -xzf "$TARBALL" -C "$RAW_DIR"
+
+# The official texmex tarball extracts into a `sift/` subdirectory. Hoist the
+# raw fvecs/ivecs up to RAW_DIR so downstream (Makefile/slice_dataset.py)
+# finds them flat.
+find "$RAW_DIR" -maxdepth 2 -type f \( -name 'sift_base.fvecs' -o -name 'sift_query.fvecs' \
+    -o -name 'sift_learn.fvecs' -o -name 'sift_groundtruth.ivecs' \) \
+    -exec mv -f {} "$RAW_DIR/" \;
 
 # Verify extracted files exist
 EXPECTED=("sift_base.fvecs" "sift_query.fvecs" "sift_learn.fvecs" "sift_groundtruth.ivecs")
