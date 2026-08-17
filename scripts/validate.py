@@ -7,12 +7,49 @@ Checks:
   - Consistent dimension across all vectors in a file
   - Correct record count
   - ivecs: all indices in valid range
+  - Component sanity: no vector has a component magnitude wildly larger than
+    the file's typical magnitude (catches corruption like a single component
+    blown up to ~1e16 while siblings are ~1e2 — issue #6)
 """
 
 import argparse
 import os
 import struct
 import sys
+
+
+def check_component_sanity(filepath, tag):
+    """Detect corrupt fvecs where a single component is blown up far beyond
+    the file's normal magnitude (issue #6: query.fvecs had components ~1e16
+    while normal components are ~1e2, passing all format checks).
+
+    Relative threshold: max|component| > 1e6 × median|component|. Robust for
+    both integer-derived descriptors (SIFT/GIST, |x|<=~256) and float
+    embeddings (Cohere/BioASQ, |x| typically <~50): natural max/median ratios
+    are <~1e3; corruption is ~1e12+. numpy-gated (skip if unavailable)."""
+    dim, count, _ = count_fvecs(filepath)
+    if dim is None or count == 0:
+        return None
+    try:
+        import numpy as np
+    except ImportError:
+        return None
+    data = np.fromfile(filepath, dtype=np.float32)
+    n_floats = count * (dim + 1)
+    if data.size < n_floats:
+        data = np.pad(data, (0, n_floats - data.size), mode="constant")
+    vecs = data[:n_floats].reshape(count, dim + 1)[:, 1:]   # drop per-vector dim prefix
+    absmed = np.median(np.abs(vecs))
+    if absmed == 0:
+        return None   # all-zero file: relative check N/A (format check already passed)
+    max_abs = float(np.abs(vecs).max())
+    ratio = max_abs / absmed
+    if ratio > 1e6:
+        raise ValueError(
+            f"[FAIL] {filepath}: component sanity failed — max|component|={max_abs:.3e} "
+            f"vs median|component|={absmed:.3e} (ratio {ratio:.1e}) — likely corrupt ({tag})"
+        )
+    return ratio
 
 
 def count_fvecs(filepath):
@@ -93,6 +130,15 @@ def validate_dataset_size(base_dir, label, expected_base, expected_query, expect
         errors.append(f"[FAIL] {query_path}: expected {expected_query} vectors, got {query_count}")
     else:
         print(f"[OK] {query_path}: {query_count} vectors, dim={qdim}")
+
+    # Component sanity (issue #6): format-valid but corrupt (blown-up component).
+    for p, tag in ((base_path, "base"), (query_path, "query")):
+        try:
+            r = check_component_sanity(p, tag)
+            if r is not None:
+                print(f"[OK] {p}: component sanity ratio={r:.1e}")
+        except ValueError as e:
+            errors.append(str(e))
 
     if dim != qdim:
         errors.append(f"[FAIL] Dimension mismatch: base dim={dim}, query dim={qdim}")
