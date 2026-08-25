@@ -8,7 +8,7 @@ Benchmark datasets for the [gsvector](https://github.com/sagitrs/gsvector) ANN i
 |---------|-----------|-------------|-------------|
 | SIFT    | 128       | ~500MB      | SIFT descriptors, classic ANN benchmark |
 | GIST    | 960       | ~3.6GB      | GIST descriptors, high-dimensional benchmark |
-| BioASQ  | ~768      | ~3GB        | Biomedical QA passage embeddings |
+| BioASQ  | 1024      | ~4.1GB (1m) | Biomedical QA passage embeddings (Cohere beir-embed-english-v3) |
 | Cohere  | 768       | ~3GB        | Wikipedia embeddings via Cohere multilingual model |
 
 Each dataset is available at four scales: **1k**, **10k**, **100k**, **1m** vectors.
