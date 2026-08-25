@@ -151,7 +151,23 @@ def validate_dataset_size(base_dir, label, expected_base, expected_query, expect
         elif k != k_val:
             errors.append(f"[FAIL] {gt_path}: expected k={k_val}, got k={k}")
         else:
-            print(f"[OK] {gt_path}: {gt_count} entries, k={k}")
+            # R-2（#12）：索引上界按档（GT 拿大库索引用小档 = 嵌套切片管线常态错）+ 行内去重
+            with open(gt_path, "rb") as f:
+                data = f.read()
+            seen_bad = []
+            for i in range(gt_count):
+                row = struct.unpack_from(f"<{k}i", data, 4 + i * (4 + 4 * k))
+                lo, hi = min(row), max(row)
+                if lo < 0 or hi >= expected_base:
+                    seen_bad.append(f"row {i}: [{lo},{hi}]")
+                elif len(set(row)) != k:
+                    seen_bad.append(f"row {i}: dup")
+                if len(seen_bad) >= 3:
+                    break
+            if seen_bad:
+                errors.append(f"[FAIL] {gt_path}: index/range/dup violations (vs base N={expected_base}): {'; '.join(seen_bad)}")
+            else:
+                print(f"[OK] {gt_path}: {gt_count} entries, k={k}, ids in [0,{expected_base}) no-dup")
 
     return errors
 
@@ -183,7 +199,7 @@ def main():
     sizes = [s.strip() for s in args.sizes.split(",")]
     expected_query = query_config.get(args.dataset, 1000)
     expected_ks = [10, 100]
-    max_id = size_config[sizes[-1]]  # use largest size as max_id bound
+    # R-2（#12）：max_id 形参退役——上界改按档 expected_base 传入（原收参即弃死参数）
 
     all_errors = []
     for label in sizes:
@@ -194,7 +210,7 @@ def main():
         print(f"\n--- Validating {args.dataset}/{label} ---")
         errors = validate_dataset_size(
             args.dataset_dir, label, expected_base, expected_query,
-            expected_ks, max_id
+            expected_ks, expected_base
         )
         all_errors.extend(errors)
 
