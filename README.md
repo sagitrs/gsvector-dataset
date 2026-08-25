@@ -30,6 +30,16 @@ bioasq/  (same as gist)
 cohere/  (same as gist)
 ```
 
+## Data Sources & 口径注记
+
+- **GIST**：base 为 texmex 官方 corpus 前 N 嵌套切片；**query 非 texmex 官方集**——
+  gist/100k query 为 base 确定性采样（`scripts/sample_query.py`，seed=2026），GT 精算
+  排自命中（`compute_groundtruth.py --exclude-self`，口径载体入仓）。1k/10k query 同法
+  （#6）。与文献对表者须知：非官方 query split，recall 数字不可直接与 texmex 榜对表。
+- **BioASQ**：Cohere/beir-embed-english-v3（HF）bioasq-corpus 前 1M 切片 + bioasq-queries
+  test split（500 条独立集）；GT=精确 NN float64 L2（非 qrels 相关性口径）。
+- **SIFT**：官方 query split（10000 条）；1m query/gt 重算挂账 #6。
+
 ## Formats
 
 | Format | Files | Consumer | `make` target |
