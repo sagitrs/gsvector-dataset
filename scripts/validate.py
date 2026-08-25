@@ -177,6 +177,7 @@ def main():
     query_config = {
         "sift": 10000,
         "gist": 1000,
+        "bioasq": 500,  # beir-embed-english-v3 bioasq-queries test split 恰 500 条
     }
 
     sizes = [s.strip() for s in args.sizes.split(",")]
