@@ -52,7 +52,7 @@ def write_ivecs(filepath, indices, k):
             f.write(indices[i].astype(np.int32).tobytes())
 
 
-def compute_groundtruth(base_vecs, query_vecs, k, metric="L2", batch_size=100):
+def compute_groundtruth(base_vecs, query_vecs, k, metric="L2", batch_size=100, exclude_self=False):
     """
     Brute-force nearest neighbors with specified distance metric.
 
@@ -67,6 +67,7 @@ def compute_groundtruth(base_vecs, query_vecs, k, metric="L2", batch_size=100):
         indices: (Q, k) int32 array of neighbor indices
     """
     Q = query_vecs.shape[0]
+    N = base_vecs.shape[0]
     all_indices = np.zeros((Q, k), dtype=np.int32)
 
     base_f64 = base_vecs.astype(np.float64)
@@ -81,23 +82,34 @@ def compute_groundtruth(base_vecs, query_vecs, k, metric="L2", batch_size=100):
         if metric == "L2":
             query_norms = np.sum(batch ** 2, axis=1)
             dists = query_norms[:, np.newaxis] + base_norms[np.newaxis, :] - 2 * dots
-            order = np.argsort  # smaller = closer
+            order = lambda a: np.argsort(a, kind='stable')  # smaller = closer（#11 N-3：tie 稳定）
         elif metric == "IP":
             dists = -dots  # larger dot = more similar
-            order = np.argsort  # sort negative dots ascending
+            order = lambda a: np.argsort(a, kind='stable')  # #11 N-3
         elif metric == "COSINE":
             query_norms = np.sqrt(np.sum(batch ** 2, axis=1))
             base_norms_sqrt = np.sqrt(base_norms)
             norms = np.maximum(query_norms[:, np.newaxis] * base_norms_sqrt[np.newaxis, :], 1e-12)
             dists = 1.0 - dots / norms
-            order = np.argsort  # smaller = more similar
+            order = lambda a: np.argsort(a, kind='stable')  # #11 N-3  # smaller = more similar
         else:
             raise ValueError(f"Unknown metric: {metric}")
 
         # Find top-k
         for j in range(end - start):
-            part = np.argpartition(dists[j], k)[:k]
-            part = part[order(dists[j][part])]
+            # 自命中 dist 经 float64 消去可为 ±ε（~1e-12·‖q‖²），非精确 0——按行阈值排除
+            # （真近邻 ≥ ~1e-3·‖q‖² 量级）；base 含重复向量时排除可 >1 个 → 窗口自适应扩
+            tol = 1e-8 * max(1.0, float(query_norms[j])) if exclude_self else -np.inf
+            w = k + 1 if exclude_self else k
+            part = None
+            while True:
+                w = min(w, N)
+                cand = np.argpartition(dists[j], w - 1)[:w] if w < N else np.arange(N)
+                cand = cand[dists[j][cand] > tol]
+                if len(cand) >= k or w >= N:
+                    part = cand[order(dists[j][cand])][:k]
+                    break
+                w *= 2
             all_indices[start + j] = part.astype(np.int32)
 
         print(f"  [gt] batch {start // batch_size + 1}/"
@@ -126,6 +138,9 @@ def main():
                         help="Queries per batch (default: 100)")
     parser.add_argument("--metric", default="L2", choices=["L2", "IP", "COSINE"],
                         help="Distance metric (default: L2)")
+    parser.add_argument("--exclude-self", action="store_true",
+                        help="query ⊂ base 口径（sample_query.py 采样集）：top-k 候选先排除"
+                             " 距离≈0 自命中再取 k（#6/#11 约定载体）")
     args = parser.parse_args()
 
     ks = [int(x.strip()) for x in args.k.split(",")]
@@ -149,7 +164,8 @@ def main():
     for k in ks:
         print(f"[gt] Computing top-{k}...")
         t0 = time.time()
-        indices = compute_groundtruth(base, query, k, metric=args.metric, batch_size=args.batch_size)
+        indices = compute_groundtruth(base, query, k, metric=args.metric, batch_size=args.batch_size,
+                                      exclude_self=args.exclude_self)
         elapsed = time.time() - t0
         print(f"[gt] top-{k} done in {elapsed:.1f}s "
               f"({elapsed / Q * 1000:.1f} ms/query)")
