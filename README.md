@@ -159,6 +159,13 @@ COHERE_BASE_URL="https://your-mirror.example.com/cohere" make cohere
 | `scripts/compute_groundtruth.py` | Brute-force k-NN ground truth (L2^2) |
 | `scripts/validate.py` | Format and integrity checks |
 
+## Test tooling
+
+**测试工具根**：`scripts/`
+
+本仓测试支撑与数据准备工具（下载 / 转换 / 切片 / 真值 / 校验）位于 [`scripts/`](scripts/)；
+逐项用途、固定命令、期望读数与失效条件见 [`scripts/README.md`](scripts/README.md)。
+
 ## License
 
 Datasets are provided under their original licenses. See source sites for details.
