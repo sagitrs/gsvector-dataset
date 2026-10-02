@@ -6,6 +6,8 @@
 
 ## 新增 Makefile 目标
 
+本档在既有目标之外新增三个目标，分别生成 CSV 格式、Iceberg 格式，或一次生成全部格式。
+
 ```makefile
 # 现有目标（不变）
 make sift              # fvecs + ivecs + ground truth
@@ -19,6 +21,8 @@ make all-formats       # make all + csv + iceberg (全量)
 ```
 
 ## 目标依赖链
+
+`make csv` 与 `make iceberg` 各自的目标都依赖同一个 `base.fvecs` 源文件。下面的图给出两种格式的依赖关系。
 
 ```
 make csv:
@@ -35,6 +39,8 @@ make iceberg:
 
 ## 模式规则
 
+转换由两条模式规则驱动，它们分别覆盖 CSV 与 Iceberg 两种输出。
+
 ```makefile
 # CSV: fvecs → CSV
 %/base.csv: %/base.fvecs scripts/fvecs2csv.py
@@ -50,16 +56,18 @@ make iceberg:
 
 ## 并行构建
 
-数据集构建是 IO 密集型（读写 fvecs/Parquet）。使用 Make 的 `-j` 标志并行构建多个数据集：
+数据集构建与输入输出（Input/Output，下称 IO）紧密相关，属 IO 密集型任务，主要开销在读写 fvecs 与 Parquet 文件。因此可以用 Make 的 `-j` 标志并行构建多个数据集。
 
 ```bash
 make -j4 csv       # 4 个数据集并行转换
 make -j8 iceberg   # 8 个 Iceberg 表并行构建
 ```
 
-Makefile 中无需特殊配置——模式规则天然支持并行。每个 `%/base.csv` 目标互不依赖，GNU Make 自动调度。
+Makefile 中无需特殊配置，因为模式规则天然支持并行。每个 `%/base.csv` 目标互不依赖，GNU Make 会自动调度它们。
 
 ## 与现有 CI 集成
+
+消费者仓库的 CI 可以按需调用这两个目标来准备数据。
 
 ```makefile
 # gsvector-pg CI 准备数据
@@ -69,4 +77,4 @@ make csv DATASET=sift SIZE=1k
 make iceberg DATASET=sift SIZE=1k
 ```
 
-消费者仓库通过 `make fetch-datasets-ci` 获取 fvecs 后，按需运行 `make csv` 或 `make iceberg`。
+消费者仓库先通过 `make fetch-datasets-ci` 获取 fvecs 数据，再按需运行 `make csv` 或 `make iceberg`。
