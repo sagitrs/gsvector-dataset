@@ -24,7 +24,7 @@ iceberg/
 
 ### metadata.json（最小可挂载）
 
-要挂载一张表，`metadata.json` 至少需要下列字段。这个例子取自一张 128 维、单快照的表。
+要挂载一张表，`metadata.json` 至少需要下列字段。这个例子取自一张单快照的表。
 
 ```json
 {
