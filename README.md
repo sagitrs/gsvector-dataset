@@ -159,6 +159,15 @@ COHERE_BASE_URL="https://your-mirror.example.com/cohere" make cohere
 | `scripts/compute_groundtruth.py` | Brute-force k-NN ground truth (L2^2) |
 | `scripts/validate.py` | Format and integrity checks |
 
+## 测试工具
+
+**测试工具根**：`scripts/`
+
+本仓**测试支撑与数据准备工具**均在 `scripts/`；逐项说明见 [`scripts/README.md`](scripts/README.md)。
+其中**测试支撑**者 = `validate.py`（格式与完整性校验，`make validate` 的实装）；其余为该目录内的数据准备工具（下载/切片/真值计算）。
+
+工具退役或移动时**须同步本声明**（条款：`gsvector-process#300` · `tester.md`「测试工具落盘与复用」）。
+
 ## License
 
 Datasets are provided under their original licenses. See source sites for details.
